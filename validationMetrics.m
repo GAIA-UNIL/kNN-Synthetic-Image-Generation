@@ -1,4 +1,4 @@
-function validationMetric = validationMetrics(targetVar,targetDim,metricV,optimisation,refValidation,synImages,stochastic,ensemble,outputDir)
+function validationMetric = validationMetrics(targetVar,targetDim,metricV,optimisation,refValidation,synImages,bootstrap,ensemble,outputDir)
 
 %
 %
@@ -17,7 +17,7 @@ for j = 1:numel(targetVar)
     refDates  = refValidation.date;
     synDates  = synValidation.date;
 
-    if stochastic == false
+    if bootstrap == false
         % Initialize an array to store the RMSE values
         if targetDim ~= 1
             validationResult = zeros(size(refImages,3), 2);
@@ -61,7 +61,7 @@ for j = 1:numel(targetVar)
             refImage = double(refImages(i));
         end
         %refImage(isnan(refImage)) = nanValue;
-        if stochastic == false
+        if bootstrap == false
             if targetDim ~= 1
                 synImage = double(synImagesAll(:,:,i));
             else
@@ -96,6 +96,9 @@ for j = 1:numel(targetVar)
                         accumulatedRef = [accumulatedRef; refImage(:)];
                         accumulatedSyn = [accumulatedSyn; synImage(:)];
                     end
+                case 7
+                    % Calculate RMSE + (1-SPEM)
+                    validationResult(i,2) = sqrt(mean((synImage - refImage).^2, 'all', 'omitnan')) + (1 - spem(synImage,refImage));
             end
         else
             %currentDate = datetime(strrep(refImageDate,'.tif',''),'InputFormat','uuuuMMdd');
@@ -105,7 +108,7 @@ for j = 1:numel(targetVar)
                 error('Dates do not match')
             end
             validationResult{i,1} = currentDate;
-            % stochastic ensembles
+            % bootstrap ensembles
             for k = 1:ensemble
                 synImage = double(synImagesAll{i}(:,:,k));
                 %synImage(isnan(synImage)) = nanValue;
@@ -130,6 +133,9 @@ for j = 1:numel(targetVar)
                             accumulatedRef = [accumulatedRef; refImage(:)];
                             accumulatedSyn = [accumulatedSyn; synImage(:)];
                         end
+                    case 7
+                        % Calculate RMSE + (1-SPEM)
+                        validationResult{i,2}(k) = sqrt(mean((synImage - refImage).^2, 'all', 'omitnan')) + (1 - spem(synImage,refImage));
                 end
             end
             % KNN result
@@ -148,20 +154,23 @@ for j = 1:numel(targetVar)
                 case 4
                     % Calculate the SPAEF
                     validationResult{i,3} = spaef(synImage,refImage);
+                case 7
+                    % Calculate RMSE + (1-SPEM)
+                    validationResult{i,3} = sqrt(mean((synImage - refImage).^2, 'all', 'omitnan')) + (1 - spem(synImage,refImage));
             end
         end
     end
 
     if metricV == 5 && targetDim == 1 % Compute KGE for the entire time series
         kgeValue = computeKGE(accumulatedSyn, accumulatedRef);
-        if stochastic == false
+        if bootstrap == false
             validationResult(:,2) = kgeValue;
         else
             validationResult{:,2} = kgeValue;
         end
     elseif metricV == 6 && targetDim == 1 % Compute NSE for the entire time series
         nseValue = computeNSE(accumulatedSyn, accumulatedRef);
-        if stochastic == false
+        if bootstrap == false
             validationResult(:,2) = nseValue;
         else
             validationResult{:,2} = nseValue;
@@ -175,20 +184,34 @@ for j = 1:numel(targetVar)
     end
 end
 
-switch metricV
-    case 1, disp(['  Mean MAE: ' num2str(mean(validationResult(:,2)))])
-    case 2, disp(['  Mean RMSE: ' num2str(mean(validationResult(:,2)))])
-    case 3, disp(['  Mean SPEM: ' num2str(mean(validationResult(:,2)))])
-    case 4, disp(['  Mean SPAEF: ' num2str(mean(validationResult(:,2)))])
-    case 5, disp(['  Mean KGE: ' num2str(mean(validationResult(:,2)))])
-    case 6, disp(['  Mean NSE: ' num2str(mean(validationResult(:,2)))])
+if bootstrap == false
+    switch metricV
+        case 1, disp(['  Mean MAE: '           num2str(mean(validationResult(:,2)))])
+        case 2, disp(['  Mean RMSE: '          num2str(mean(validationResult(:,2)))])
+        case 3, disp(['  Mean SPEM: '          num2str(mean(validationResult(:,2)))])
+        case 4, disp(['  Mean SPAEF: '         num2str(mean(validationResult(:,2)))])
+        case 5, disp(['  Mean KGE: '           num2str(mean(validationResult(:,2)))])
+        case 6, disp(['  Mean NSE: '           num2str(mean(validationResult(:,2)))])
+        case 7, disp(['  Mean RMSE+(1-SPEM): ' num2str(mean(validationResult(:,2)))])
+    end
+else
+    switch metricV
+        case 1, disp(['  Mean MAE: '           num2str(mean(cell2mat(validationResult(:,3))))])
+        case 2, disp(['  Mean RMSE: '          num2str(mean(cell2mat(validationResult(:,3))))])
+        case 3, disp(['  Mean SPEM: '          num2str(mean(cell2mat(validationResult(:,3))))])
+        case 4, disp(['  Mean SPAEF: '         num2str(mean(cell2mat(validationResult(:,3))))])
+        case 5, disp(['  Mean KGE: '           num2str(mean(cell2mat(validationResult(:,3))))])
+        case 6, disp(['  Mean NSE: '           num2str(mean(cell2mat(validationResult(:,3))))])
+        case 7, disp(['  Mean RMSE+(1-SPEM): ' num2str(mean(cell2mat(validationResult(:,3))))])
+    end
+end
 
-        if optimisation == false
-            disp('Saving validationMetric.mat table...')
-            validationSave = fullfile(outputDir,'validationMetric.mat');
-            save(validationSave, 'validationMetric');
-        else % for optimisation run
-            validationMetric = validOptim;
-        end
+if optimisation == false
+    disp('Saving validationMetric.mat table...')
+    validationSave = fullfile(outputDir,'validationMetric.mat');
+    save(validationSave, 'validationMetric');
+else % for optimisation run
+    validationMetric = validOptim;
+end
 
 end

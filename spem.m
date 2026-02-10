@@ -6,14 +6,14 @@ if ndims(x) == 3 && ndims(y) == 3
     for n = 1:numLayers
         spemOut(n) = spem2D(x(:,:,n), y(:,:,n));
         if isnan(spemOut(n))
-            spemOut(n) = 1 - hamming(x(:,:,n), y(:,:,n));
+            spemOut(n) = single(1 - hamming(x(:,:,n), y(:,:,n)));
         end
     end
 else
     % Handle 2D input
     spemOut = spem2D(x, y);
     if isnan(spemOut)
-        spemOut = 1 - hamming(x, y);
+        spemOut = single(1 - hamming(x, y));
     end
 end
 end

@@ -52,8 +52,9 @@ kNNsorting        = true;       % true = create sorted data,     false = load so
 generateImage     = true;       % true = image generation ON,    false = image generation OFF
 
 % Bootstrap switches (NOT INFLUENCED BY VALIDATION SWITCHES)
+stochastic        = false;
 bootstrap         = false;      % true = bootstrap ON,                  false = bootstrap OFF
-bsSaveAll         = false;      % true = saves all bootstrap ensembles, false = saves only min, deterministic and max bootstrap ensembles as netCDF files
+stoSveAll         = false;      % true = saves all bootstrap ensembles, false = saves only min, deterministic and max bootstrap ensembles as netCDF files
 
 % Validation switches
 validationPrep    = false;          % true = validation preparation ON, false = validation preparation OFF (!!! BYPASSES PREVIOUS SWITCHES !!!)
@@ -94,6 +95,6 @@ nbOptiRuns        = 50;         % Number of runs for the Bayesian optimisation a
     MAIN(...
     rawDir,outputDir,optiWeightsDir,maskDir,lulcDir,targetVar,climateVars,normMethods,QdateStart,QdateEnd,LdateStart,LdateEnd,outputTime,targetDim,saveMats, ...
     useDOY,shortWindow,longWindow,daysRange,nbImages,metricKNN,ensemble,generationType,mps,outputType,coordRefSysCode,parallelComputing, ...
-    netCDFtoInputs,createGenWeights,kNNsorting,generateImage,stochastic,stoSaveAll,validationPrep,validation,pixelWise,createGIF, ...
+    netCDFtoInputs,createGenWeights,kNNsorting,generateImage,stochastic,bootstrap,stoSveAll,validationPrep,validation,pixelWise,createGIF, ...
     metricViz,metricV,nanValue,varLegend,varRange,errRange,sensiAnalysis,nbImages_range,longWindow_range,optimPrep,saveOptimPrep,optimisation,nbOptiRuns);
 

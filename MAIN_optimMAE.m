@@ -58,8 +58,8 @@ if sensiAnalysis == false
         climateData    = climateData.climateData;
         disp('Loading GeoRef.mat file...')
         if targetDim ~= 1
-            geoRef     = load(fullfile(inDir,'GeoRef.mat'));
-            geoRef     = geoRef.geoRef;
+            geoRef         = load(fullfile(inDir,'GeoRef.mat'));
+            geoRef         = geoRef.geoRef;
         else
             geoRef = [];
         end
@@ -77,7 +77,7 @@ if sensiAnalysis == false
     elseif createGenWeights == false
         disp('Loading optimisedWeights.mat file...')
         optimisedWeights = load(optiWeightsDir);
-        Weights = optimisedWeights.optimisedWeightsTable;
+        Weights = optimisedWeights.optimisedWeights;
     end
     
     % TEMPORARY FIX FOR PIXELWISE SIZE MISMATCH
@@ -129,7 +129,7 @@ if sensiAnalysis == false
     %% Generation of Synthetic Images
     disp('--- 3. SYNTHETIC IMAGES GENERATION ---')
     
-    if ((generateImage == true && validation == true) || generateImage == true) && optimisation == false
+    if (generateImage == true && validation == true) && optimisation == false
         if pixelWise == false
             synImages = generateSynImages(maskDir,targetVar,targetDim,learningDates,sortedDates,mps,lulcDir,geoRef,outDir,generationType,validation,saveNetCDF,stochastic,stoSaveAll,nbImages,ensemble,outputType);
         else
@@ -155,7 +155,7 @@ if sensiAnalysis == false
         
         validationMetric = validationMetrics(targetVar,targetDim,metricV,optimisation,refValidation,synImages,stochastic,ensemble,outDir);
         visualiseMetrics(nbImages,pixelWise,targetVar,climateVars,targetDim,refValidation,synImages,validationMetric,sortedDates,climateData,metricV,nanValue,varLegend,varRange,errRange,metricKNN,LdateStart,LdateEnd,QdateStart,QdateEnd,daysRange,outputTime,stochastic,outDir,createGIF);
-        
+
         disp('--- 4. VALIDATION DONE ---')
     else
         validationMetric = [];
@@ -181,9 +181,9 @@ end
 if optimisation == true
     disp('--- 4. OPTIMISATION ---')
     
-    if saveOptimPrep == true
-        sortedDates = [];
-    end
+%     if saveOptimPrep == true
+%         sortedDates = [];
+%     end
     
     % Get the table variable names
     variableNames = string(Weights.Properties.VariableNames);
@@ -194,32 +194,29 @@ if optimisation == true
     % Iterate over each variable
     for i = 1:numel(variableNames)
         bayesWeights(i) = optimizableVariable(variableNames{i}, [0, 1], 'Type', 'real');
-        initialW.(variableNames{i}) = 1;
+        initW.(variableNames{i}) = 1;
     end
-    initialW = struct2table(initialW);
+    initialW = struct2table(initW);
     % Set up the Bayesian optimization
-    fun = @(x)computeObjectiveOptim(x.(1), x.(2), x.(3), x.(4), x.(5), x.(6), x.(7), x.(8), ...
+    fun = @(x)computeObjectiveOptim_mae(x.(1), x.(2), x.(3), x.(4), ...
         targetVar, targetDim, learningDates, sortedDates, refValidation, saveOptimPrep, metricKNN, nbImages, ...
         generationType, metricV, optimisation, useDOY, inDir, outDir);
     % Run the Bayesian optimization
     %if parallelComputing == true
     %    results = bayesopt(fun,bayesWeights,'Verbose',0,'AcquisitionFunctionName','expected-improvement-plus','MaxObjectiveEvaluations',nbOptiRuns,'UseParallel',true);
     %else
-    results = bayesopt(fun,bayesWeights(1:8),'Verbose',0,'AcquisitionFunctionName','expected-improvement-plus','MaxObjectiveEvaluations',nbOptiRuns,'InitialX',initialW(:,1:8));
+    results = bayesopt(fun,bayesWeights,'Verbose',0,'AcquisitionFunctionName','expected-improvement-plus','MaxObjectiveEvaluations',nbOptiRuns,'InitialX',initialW);
     %end
     % Retrieve the optimal weights
     disp('  Saving optimisedWeights.mat...')
     optimisedWeights = results.XAtMinObjective;
     % Normalize weights (variables and metrics separately)
     optimisedWeightsArray = table2array(optimisedWeights);
-    variablesWeights = optimisedWeightsArray(1:7);
-    metricsWeights   = optimisedWeightsArray(8);
-    helWeight        = 1 - metricsWeights;
-    metricsWeights   = [metricsWeights helWeight];
+    variablesWeights = optimisedWeightsArray;
     
     variablesWeights = variablesWeights / sum(variablesWeights); % Normalize variables weights
     
-    optimisedWeightsNormalized = [variablesWeights, metricsWeights]; % Combine normalized weights
+    optimisedWeightsNormalized = [variablesWeights]; % Combine normalized weights
     
     % Convert to table and save
     optimisedWeightsTable = array2table(optimisedWeightsNormalized, 'VariableNames', variableNames)

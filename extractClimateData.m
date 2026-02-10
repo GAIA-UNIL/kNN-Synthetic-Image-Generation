@@ -1,4 +1,4 @@
-function climateData = extractClimateData(climateVars,rawData,normMethods,QdateStart,QdateEnd,LdateStart,LdateEnd,longWindow,inputDir,saveMats)
+function [climateData,LdateStart,LdateEnd] = extractClimateData(climateVars,rawData,normMethods,QdateStart,QdateEnd,LdateStart,LdateEnd,longWindow,inputDir,saveMats)
 
 %
 %
@@ -84,17 +84,21 @@ end
 [rLD,~] = find(datetime(climateData.date,'ConvertFrom','yyyymmdd')>=datetime(LdateStart,'ConvertFrom','yyyymmdd')-days(longWindow) ...
     & datetime(climateData.date,'ConvertFrom','yyyymmdd')<=datetime(LdateEnd,'ConvertFrom','yyyymmdd'));
 if min(datetime(climateData.date,'ConvertFrom','yyyymmdd'))>datetime(LdateStart,'ConvertFrom','yyyymmdd')
-    error('Climate data first date > Learning period start')
+    warning(['Climate data first date > Learning period start. LdateStart changed to ' num2str(min(datetime(climateData.date,'ConvertFrom','yyyymmdd')))])
+    LdateStart = min(datetime(climateData.date,'ConvertFrom','yyyymmdd'));
 elseif max(datetime(climateData.date,'ConvertFrom','yyyymmdd'))<datetime(LdateEnd,'ConvertFrom','yyyymmdd')
-    error('Climate data last date < Learning period end')
+    warning(['Climate data last date < Learning period end. LdateEnd changed to ' num2str(max(datetime(climateData.date,'ConvertFrom','yyyymmdd')))])
+    LdateEnd = max(datetime(climateData.date,'ConvertFrom','yyyymmdd'));
 end
 
 [rQD,~] = find(datetime(climateData.date,'ConvertFrom','yyyymmdd')>=datetime(QdateStart,'ConvertFrom','yyyymmdd')-days(longWindow) ...
     & datetime(climateData.date,'ConvertFrom','yyyymmdd')<=datetime(QdateEnd,'ConvertFrom','yyyymmdd'));
 if min(datetime(climateData.date,'ConvertFrom','yyyymmdd'))>datetime(QdateStart,'ConvertFrom','yyyymmdd')
-    error('Climate data first date > Query period start')
+    error(['Climate data first date > Query period start. QdateStart changed to ' num2str(min(datetime(climateData.date,'ConvertFrom','yyyymmdd')))])
+%     QdateStart = min(datetime(climateData.date,'ConvertFrom','yyyymmdd'));
 elseif max(datetime(climateData.date,'ConvertFrom','yyyymmdd'))<datetime(QdateEnd,'ConvertFrom','yyyymmdd')
-    error('Climate data last date < Query period end')
+    error(['Climate data last date < Query period end. QdateEnd changed to ' num2str(max(datetime(climateData.date,'ConvertFrom','yyyymmdd')))])
+%     QdateEnd = max(datetime(climateData.date,'ConvertFrom','yyyymmdd'));
 end
 r = unique([rLD; rQD]);
 

@@ -122,13 +122,14 @@ if parallelComputing == true
                         % Climate distance
                         % 1 date, 2 distance
                         climateDistAll = cell(ld,1);
+                        doyDist        = nan(ld,1);
                         climVarIdx     = zeros(1,numel(climateVarsNames));
                         otherIdx       = ~climVarIdx;
 
                         % DOY distance
                         if useDOY
                             absDiff = abs(dayOfYearQ - dayOfYearL);
-                            doyDist = min(absDiff, 365-absDiff)/daysRange;
+                            doyDist(ld) = min(absDiff, 365-absDiff)/daysRange;
                         end
 
                         if sum(ismember(normMethods,4))>=1
@@ -186,22 +187,27 @@ if parallelComputing == true
                                 climateDistance{ld,3}(1,:) = zeros(1,size(climateDistAll{ld,2},2));
                             end
                         end
-                        if optimPrep == false 
-                            climateDistance{ld,2}(2,:) = sum(climateDistAll{ld,1}(shortWindow+1:end,:),1);
-                        elseif optimPrep == true && metricKNN == 5
+                        if optimPrep == true && metricKNN == 5
                             climateDistance{ld,2}(2,:) = sum(climateDistAll{ld,1}(shortWindow+1:end,:),1);
                             climateDistance{ld,3}(2,:) = sum(climateDistAll{ld,2}(shortWindow+1:end,:),1);
                             if useDOY
-                                climateDistance{ld,4} = weightDOY * doyDist;
+                                climateDistance{ld,4} = doyDist(ld);
+                            end
+                        else
+                            climateDistance{ld,2}(2,:) = sum(climateDistAll{ld,1}(shortWindow+1:end,:),1);
+                            if optimPrep == true & useDOY == true
+                                climateDistance{ld,3} = doyDist(ld);
                             end
                         end
                         % Assign weights to corresponding index
                         if optimPrep == false
-                            climateDistance{ld,2}(1,:) = climateDistance{ld,2}(1,:) .* weightsShort;
+                            if shortWindow > 0
+                                climateDistance{ld,2}(1,:) = climateDistance{ld,2}(1,:) .* weightsShort;
+                            end
                             climateDistance{ld,2}(2,:) = climateDistance{ld,2}(2,:) .* weightsLong;
                             climateDistance{ld,2} = sum(climateDistance{ld,2},'all');
                             if useDOY
-                                climateDistance{ld,2} = climateDistance{ld,2} + (weightDOY * doyDist);
+                                climateDistance{ld,2} = climateDistance{ld,2} + (weightDOY * doyDist(ld));
                             end
                         end
                     else
@@ -368,19 +374,24 @@ else % serial computing
                                 climateDistance{ld,3}(1,:) = zeros(1,size(climateDistAll{:,2},2));
                             end
                         end
-                        if optimPrep == false 
-                            climateDistance{ld,2}(2,:) = sum(climateDistAll(shortWindow+1:end,:),1);
-                        elseif optimPrep == true && metricKNN == 5
+                        if optimPrep == true && metricKNN == 5
                             climateDistance{ld,2}(2,:) = sum(climateDistAll{:,1}(shortWindow+1:end,:),1);
                             climateDistance{ld,3}(2,:) = sum(climateDistAll{:,2}(shortWindow+1:end,:),1);
                             if useDOY
-                                climateDistance{ld,4} = weightDOY * doyDist;
+                                climateDistance{ld,4} = doyDist;
+                            end
+                        else
+                            climateDistance{ld,2}(2,:) = sum(climateDistAll(shortWindow+1:end,:),1);
+                            if optimPrep == true & useDOY == true
+                                climateDistance{ld,3} = doyDist;
                             end
                         end
 
                         % Assign weights to corresponding index
                         if optimPrep == false
-                            climateDistance{ld,2}(1,:) = climateDistance{ld,2}(1,:) .* weightsShort;
+                            if shortWindow > 0
+                                climateDistance{ld,2}(1,:) = climateDistance{ld,2}(1,:) .* weightsShort;
+                            end
                             climateDistance{ld,2}(2,:) = climateDistance{ld,2}(2,:) .* weightsLong;
                             climateDistance{ld,2} = sum(climateDistance{ld,2},'all');
                             if useDOY

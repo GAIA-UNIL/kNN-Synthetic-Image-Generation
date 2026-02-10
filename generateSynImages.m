@@ -1,4 +1,4 @@
-function synImages = generateSynImages(maskDir,targetVar,targetDim,learningDates,sortedDates,mps,lulcDir,geoRef,outputDir,generationType,validation,saveNetCDF,stochastic,stoSaveAll,nbImages,ensemble,outputType)
+function synImages = generateSynImages(maskDir,targetVar,targetDim,learningDates,sortedDates,mps,lulcDir,geoRef,outputDir,generationType,validation,saveNetCDF,stochastic,bootstrap,stoSaveAll,nbImages,ensemble,outputType)
 
 %
 %
@@ -17,9 +17,10 @@ for i = 1:numel(targetVarL)
     % Preallocate variables for efficiency
     learningDatesDate = table2array(learningDates(:,'date'));
     learningData      = table2array(learningDates(:,i+1));
+    sizeMap           = size(learningData{1,1});
 
     if generationType == 5
-        [di, partialTi, ki, sp] = createInputsMPS(lulcDir,mps,maskDir);
+        [di, partialTi, ki, sp] = createInputsMPS(lulcDir,mps,maskDir,sizeMap);
     end
 
     if targetDim ~= 1
@@ -36,9 +37,9 @@ for i = 1:numel(targetVarL)
         availablePix = imagesSynAll;
         varianceEns   = imagesSynAll;
 
-        if stochastic == true
+        if bootstrap == true
             imagesSynAll = cell(size(sortedDates,1),1);
-            disp(['  stochastic switch ON, using ' num2str(ensemble) ' ensembles'])
+            disp(['  bootstrap switch ON, using ' num2str(ensemble) ' ensembles'])
         end
         % Display progress
         progress = 0;
@@ -53,7 +54,7 @@ for i = 1:numel(targetVarL)
         end
 
         % netCDF file definition
-        if outputType == 2 && stochastic == false && saveNetCDF == true
+        if outputType == 2 && bootstrap == false && saveNetCDF == true
             % Define the main netCDF file
             outputBaseName = strcat(targetVarL(i),'.nc');
             fullDestinationFileName = fullfile(outputDir, outputBaseName);
@@ -109,7 +110,7 @@ for i = 1:numel(targetVarL)
             % Assign latitude and longitude values to the corresponding variables
             netcdf.putVar(ncid,latid,lat);
             netcdf.putVar(ncid,lonid,lon);
-        elseif stochastic == true && saveNetCDF == true
+        elseif bootstrap == true && saveNetCDF == true
             % ---- MININMAL ----
             % Define the main netCDF file
             outputBaseNameMin = strcat(targetVarL(i),'_min.nc');
@@ -278,7 +279,7 @@ for i = 1:numel(targetVarL)
     end
 
     for rowIndex = 1:size(sortedDates,1)
-        if stochastic == true
+        if bootstrap == true
             if stoSaveAll == true
                 outputDirstochastic = fullfile(outputDir, 'stochasticEnsembles', string(sortedDates(rowIndex,1)));
                 if ~exist(outputDirstochastic,'dir')
@@ -360,10 +361,9 @@ for i = 1:numel(targetVarL)
             end
             map(:,:,rowIndex) = resultImages;
 %             resultImages(isnan(resultImages)) = -999;
-            % stochastic
+            % bootstrap
             resultImagesEns     = NaN(imgLength, imgWidth, ensemble);
             %invDistance      = 1 ./ sortedDates{rowIndex,3};
-            %stochasticWeights = normalize(invDistance,'range',[0.1 1]); % normalise distance (3) / std (4) to [0.1 1]
             %stochasticWeights = invDistance/sum(invDistance);
             for ens = 1:ensemble
                 if generationType ~=5
@@ -515,79 +515,87 @@ for i = 1:numel(targetVarL)
                     selectedImages(imageIndex) = learningData(dateIndex(imageIndex));
                 end
             end
-            % Calculate either the mode or the mean of the selected images
-            if generationType == 1
-                % Calculate the mode and save it to resultImages
-                if targetDim ~= 1
-                    resultImages = mode(selectedImages,3);
-                else
-                    resultImages = mode(selectedImages);
-                end
-            elseif generationType == 2
-                % Calculate the mean and save it to resultImages
-                sortedDates{rowIndex,3}(sortedDates{rowIndex,3} == 0) = eps;
-                selectedDist = 1./sortedDates{rowIndex,3}(1:nbImages);
-                % Normalize the selectedDist values
-                normalizedWeights = selectedDist / sum(selectedDist);
-                % Perform element-wise multiplication with the weights
-                if targetDim ~= 1
-                    weightedImages = bsxfun(@times, selectedImages, reshape(normalizedWeights, 1, 1, nbImages)); %length(sortedDates{rowIndex,2})
-                    varMap(:,:,rowIndex) = var(selectedImages,normalizedWeights,3);
-                    resultImages = sum(weightedImages,3);
-                else
-                    weightedImages = selectedImages .* normalizedWeights;
-                    varMap(rowIndex) = var(selectedImages,normalizedWeights);
-                    resultImages = sum(weightedImages);
-                end
-            elseif generationType == 3
-                % Calculate the mean and save it to resultImages
-                if targetDim ~= 1
-                    resultImages = mean(selectedImages,3);
-                else
-                    resultImages = mean(selectedImages);
-                end
-            elseif generationType == 4
-                % Calculate the median and save it to resultImages
-                if targetDim ~= 1
-                    resultImages = median(selectedImages,3);
-                else
-                    resultImages = median(selectedImages);
-                end
-            elseif generationType == 5
-                % Perform MPS simulation to generate result
-                if targetDim ~= 1
-                    ti = cell(1, size(selectedImages, 3));
-                    for img = 1:size(selectedImages, 3)
-                        ti{img} = cat(3, selectedImages(:, :, img), partialTi);
-%                         ti_small{img} = cat(3, selectedImages(:, :, img), lat_ti);
+            if stochastic == false
+                % Calculate either the mode or the mean of the selected images
+                if generationType == 1
+                    % Calculate the mode and save it to resultImages
+                    if targetDim ~= 1
+                        resultImages = mode(selectedImages,3);
+                    else
+                        resultImages = mode(selectedImages);
                     end
-%                     di_small = cat(3, di(:,:,1), lat);
-                    resultImages = g2s('-sa', mps.servAd, ...
-                        '-a','qs', ...
-                        '-di',di, ...
-                        '-ti',ti, ...
-                        '-ki',ki, ...
-                        '-sp',sp, ...
-                        '-dt',mps.dataType, ...
-                        '-k',mps.kValue, ...
-                        '-n',mps.neighbours, ...
-                        '-j',mps.processPwr, ...
-                        '-s',mps.seed);
-                    resultImages = resultImages(:,:,1);
+                elseif generationType == 2
+                    % Calculate the mean and save it to resultImages
+                    sortedDates{rowIndex,3}(sortedDates{rowIndex,3} == 0) = eps;
+                    selectedDist = 1./sortedDates{rowIndex,3}(1:nbImages);
+                    % Normalize the selectedDist values
+                    normalizedWeights = selectedDist / sum(selectedDist);
+                    % Perform element-wise multiplication with the weights
+                    if targetDim ~= 1
+                        weightedImages = bsxfun(@times, selectedImages, reshape(normalizedWeights, 1, 1, nbImages)); %length(sortedDates{rowIndex,2})
+                        varMap(:,:,rowIndex) = var(selectedImages,normalizedWeights,3);
+                        resultImages = sum(weightedImages,3);
+                    else
+                        weightedImages = selectedImages .* normalizedWeights;
+                        varMap(rowIndex) = var(selectedImages,normalizedWeights);
+                        resultImages = sum(weightedImages);
+                    end
+                elseif generationType == 3
+                    % Calculate the mean and save it to resultImages
+                    if targetDim ~= 1
+                        resultImages = mean(selectedImages,3);
+                    else
+                        resultImages = mean(selectedImages);
+                    end
+                elseif generationType == 4
+                    % Calculate the median and save it to resultImages
+                    if targetDim ~= 1
+                        resultImages = median(selectedImages,3);
+                    else
+                        resultImages = median(selectedImages);
+                    end
+                elseif generationType == 5
+                    % Perform MPS simulation to generate result
+                    if targetDim ~= 1
+                        ti = cell(1, size(selectedImages, 3));
+                        for img = 1:size(selectedImages, 3)
+                            ti{img} = cat(3, selectedImages(:, :, img), partialTi);
+                            %                         ti_small{img} = cat(3, selectedImages(:, :, img), lat_ti);
+                        end
+                        %                     di_small = cat(3, di(:,:,1), lat);
+                        resultImages = g2s('-sa', mps.servAd, ...
+                            '-a','qs', ...
+                            '-di',di, ...
+                            '-ti',ti, ...
+                            '-ki',ki, ...
+                            '-sp',sp, ...
+                            '-dt',mps.dataType, ...
+                            '-k',mps.kValue, ...
+                            '-n',mps.neighbours, ...
+                            '-j',mps.processPwr, ...
+                            '-s',mps.seed);
+                        resultImages = resultImages(:,:,1);
+                    else
+                        resultImages = g2s('-a','qs', ...
+                            '-di',di, ...
+                            '-ti',selectedImages, ...
+                            '-ki',ki, ...
+                            '-sp',sp, ...
+                            '-dt',mps.dataType, ...
+                            '-k',mps.kValue, ...
+                            '-n',mps.neighbours, ...
+                            '-j',mps.processPwr, ...
+                            '-s',mps.seed);
+                    end
                 else
-                    resultImages = g2s('-a','qs', ...
-                        '-di',di, ...
-                        '-ti',selectedImages, ...
-                        '-ki',ki, ...
-                        '-sp',sp, ...
-                        '-dt',mps.dataType, ...
-                        '-k',mps.kValue, ...
-                        '-n',mps.neighbours, ...
-                        '-j',mps.processPwr, ...
-                        '-s',mps.seed);
+                    error('Generation type not defined!')
                 end
             else
-                error('Generation type not defined!')
+                invDistance    = 1 ./ sortedDates{rowIndex,3};
+                probaDist      = invDistance/sum(invDistance);
+                stochasticDate = randsample(sortedDates{rowIndex,2},1,true,probaDist);
+                [~, dateIndex] = ismember(stochasticDate,learningDatesDate);
+                resultImages   = cell2mat(learningData(dateIndex));
             end
             if targetDim ~= 1
                 map(:,:,rowIndex) = resultImages;
@@ -642,10 +650,10 @@ for i = 1:numel(targetVarL)
         progress = (100*(rowIndex/size(sortedDates,1)));
         fprintf(1,'\b\b\b\b%3.0f%%',progress);
     end
-    if outputType == 2 && stochastic == false && targetDim ~= 1  && saveNetCDF == true
+    if outputType == 2 && bootstrap == false && targetDim ~= 1  && saveNetCDF == true
         % Close the main netCDF file after the loop
         netcdf.close(ncid);
-    elseif stochastic == true
+    elseif bootstrap == true
         netcdf.close(ncid_min);
         netcdf.close(ncid_det);
         netcdf.close(ncid_max);
@@ -680,7 +688,7 @@ for i = 1:numel(targetVarL)
     synImages.(varPix) = (availablePix./nbImages).*100;
     varName = strcat(targetVarL(i), "_Variance");
     synImages.(varName) = varMap;
-    if stochastic == true
+    if bootstrap == true
         varEns = strcat(targetVarL(i), "_stochastic");
         EnsVariance = strcat(varEns, "Variance");
         synImages.(varEns) = imagesSynAll;

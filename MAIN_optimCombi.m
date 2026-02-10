@@ -155,7 +155,7 @@ if sensiAnalysis == false
         
         validationMetric = validationMetrics(targetVar,targetDim,metricV,optimisation,refValidation,synImages,stochastic,ensemble,outDir);
         visualiseMetrics(nbImages,pixelWise,targetVar,climateVars,targetDim,refValidation,synImages,validationMetric,sortedDates,climateData,metricV,nanValue,varLegend,varRange,errRange,metricKNN,LdateStart,LdateEnd,QdateStart,QdateEnd,daysRange,outputTime,stochastic,outDir,createGIF);
-        
+
         disp('--- 4. VALIDATION DONE ---')
     else
         validationMetric = [];
@@ -194,26 +194,26 @@ if optimisation == true
     % Iterate over each variable
     for i = 1:numel(variableNames)
         bayesWeights(i) = optimizableVariable(variableNames{i}, [0, 1], 'Type', 'real');
-        initialW.(variableNames{i}) = 1;
+        initW.(variableNames{i}) = 1;
     end
-    initialW = struct2table(initialW);
+    initialW = struct2table(initW);
     % Set up the Bayesian optimization
-    fun = @(x)computeObjectiveOptim(x.(1), x.(2), x.(3), x.(4), x.(5), x.(6), x.(7), x.(8), ...
+    fun = @(x)computeObjectiveOptim_combi(x.(1), x.(2), x.(3), x.(4), x.(5), ...
         targetVar, targetDim, learningDates, sortedDates, refValidation, saveOptimPrep, metricKNN, nbImages, ...
         generationType, metricV, optimisation, useDOY, inDir, outDir);
     % Run the Bayesian optimization
     %if parallelComputing == true
     %    results = bayesopt(fun,bayesWeights,'Verbose',0,'AcquisitionFunctionName','expected-improvement-plus','MaxObjectiveEvaluations',nbOptiRuns,'UseParallel',true);
     %else
-    results = bayesopt(fun,bayesWeights(1:8),'Verbose',0,'AcquisitionFunctionName','expected-improvement-plus','MaxObjectiveEvaluations',nbOptiRuns,'InitialX',initialW(:,1:8));
+    results = bayesopt(fun,bayesWeights(1:5),'Verbose',0,'AcquisitionFunctionName','expected-improvement-plus','MaxObjectiveEvaluations',nbOptiRuns,'InitialX',initialW(:,1:5));
     %end
     % Retrieve the optimal weights
     disp('  Saving optimisedWeights.mat...')
     optimisedWeights = results.XAtMinObjective;
     % Normalize weights (variables and metrics separately)
     optimisedWeightsArray = table2array(optimisedWeights);
-    variablesWeights = optimisedWeightsArray(1:7);
-    metricsWeights   = optimisedWeightsArray(8);
+    variablesWeights = optimisedWeightsArray(1:4);
+    metricsWeights   = optimisedWeightsArray(5);
     helWeight        = 1 - metricsWeights;
     metricsWeights   = [metricsWeights helWeight];
     

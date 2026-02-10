@@ -30,7 +30,7 @@ for iRange = 1:length(nbImages_range)
 
         disp('--- 1. READING DATA ---')
         disp('Extracting climate informations...')
-        climateData    = extractClimateData(climateVars,rawData,normMethods,QdateStart,QdateEnd,LdateStart,LdateEnd,longWindow,inDir,false);
+        [climateData,LdateStart,LdateEnd] = extractClimateData(climateVars,rawData,normMethods,QdateStart,QdateEnd,LdateStart,LdateEnd,longWindow,inDir,false);
         disp('Extracting Learning dates...')
         learningDates  = convertStructureToLearningDates(targetVar,LdateStart,LdateEnd,QdateStart,QdateEnd,rawData,climateData,targetDim,false,inDir,false);
         disp('Extracting Query dates...')
@@ -44,7 +44,7 @@ for iRange = 1:length(nbImages_range)
         disp('--- 2. KNN DATA SORTING DONE ---')
 
         disp('--- 3. SYNTHETIC IMAGES GENERATION ---')
-        synImages = generateSynImages_ParamOptim(targetVar,targetDim,learningDates,sortedDates,nbImages,outDir,generationType,true,false,stochastic,stoSaveAll,ensemble);
+        synImages = generateSynImgsOptim(targetVar,targetDim,learningDates,sortedDates,nbImages,generationType);
         disp('--- 3. SYNTHETIC IMAGES GENERATION DONE ---')
 
         disp('--- 4. VALIDATION ---')
@@ -77,7 +77,7 @@ else
 end
 best = sortedMeanTS(1,2);
 
-metrics = {'MAE','RMSE','SPEM','SPAEF','KGE','NSE'};
+metrics = {'MAE','RMSE','SPEM','SPAEF','KGE','NSE','RMSE+(1-SPEM)'};
 
 it = 0;
 bestDistImg = nan(size(sensitivityResults));
@@ -95,20 +95,19 @@ for i = 1:size(sensitivityResults, 1)
     end
 end
 
-figure('WindowState', 'maximized');
+figure;
 hold on
-imagesc(bestDistImg)
+imagesc(longWindow_range, nbImages_range, bestDistImg)
+set(gca,'YDir','normal')
 colormap(gca, turbo(256));
-ylabel('\it k')
-yticks(nbImages_range)
-yticklabels({nbImages_range})
-ylim([min(nbImages_range) max(nbImages_range)])
 xlabel('Climate window length')
-xticks(longWindow_range)
-xticklabels({longWindow_range})
-xlim([min(longWindow_range) max(longWindow_range)])
-hcb=colorbar;
-set(get(hcb,'label'),'string',['Mean ' metrics{metricV}],'Rotation',90);
+ylabel('\it k')
+dx = longWindow_range(2) - longWindow_range(1);
+dy = nbImages_range(2) - nbImages_range(1);
+xlim([longWindow_range(1)-dx/2, longWindow_range(end)+dx/2])
+ylim([nbImages_range(1)-dy/2,  nbImages_range(end)+dy/2])
+hcb = colorbar;
+set(get(hcb,'label'),'string',['Mean ' metrics{metricV}], 'Rotation',90);
 set(gcf, 'color', 'white');
 title('Best parameters combination')
 saveas(gcf,strcat(outDir,'sensitivityAnalysis.png'))

@@ -1,8 +1,12 @@
-function [di, partialTi, ki, sp] = createInputsMPS(lulcDir,mps,maskDir)
+function [di, partialTi, ki, sp] = createInputsMPS(lulcDir,mps,maskDir,sizeMap)
 
 % CREATE MASK
 % Mask with shape of image
-mask = single(readgeoraster(maskDir));
+if mps.useMask == true
+    mask = single(readgeoraster(maskDir));
+else
+    mask = ones(sizeMap);
+end
 sg = nan(size(mask));
 
 % CREATE LATLON LAYERS
@@ -40,11 +44,21 @@ for w = 1:length(mps.kernel_weights)
 end
 
 % CREATE SP
-rng(mps.seed)
-values = randperm(numel(mask));
-sp = reshape(values, size(mask));
-if mps.useMask == true
-    sp(mask==0) = -inf;
+if mps.useSP == true
+    rng(mps.seed)
+    values = randperm(numel(mask));
+    spSingle = reshape(values, size(mask));
+    if mps.useMask == true
+        filler = ones(size(partialTi)) * -inf;
+        spSingle(mask==0) = -inf;
+        sp = cat(3,spSingle,filler);
+    end
+else
+    if mps.useMask == true
+        di(isnan(di)) = -999;
+        di(mask==1)   = nan;
+    end
+    sp = [];
 end
 
 end
